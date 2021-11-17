@@ -10,3 +10,34 @@
   PS:本项目采用的是天启代理ip。该网站网址为：https://www.tianqiip.com/  进入该网站后，注册自己的账号,在左上角的个人中心中，点击我的套餐，即可看见自己的提取密钥。
 
 注：每次运行项目的时候，在main.py中直接运行。并且项目根目录下只留main.py和stopword.txt两个文件。
+
+
+请提前确认一下的运行库是否已经安装：
+
+import requests
+
+import os
+
+import csv
+
+import json
+
+import time
+
+from lxml import etree
+
+from snownlp import SnowNLP
+
+import random
+
+import jieba
+
+from collections import Counter
+
+import matplotlib.pyplot as plt
+
+from wordcloud import WordCloud
+
+from dateutil.parser import parse
+
+from random import choice
