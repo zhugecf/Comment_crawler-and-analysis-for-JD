@@ -12,6 +12,10 @@
 注：每次运行项目的时候，在main.py中直接运行。并且项目根目录下只留main.py和stopword.txt两个文件。
 
 
+
+
+
+
 请提前确认一下的运行库是否已经安装：
 
 import requests
