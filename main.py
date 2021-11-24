@@ -8,27 +8,26 @@ from snownlp import SnowNLP
 import random
 import jieba
 from collections import Counter
-import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 from dateutil.parser import parse
 from random import choice
-import socket
+from multiprocessing.dummy import Pool
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36'
 }
 def pre_data():
     url1 = 'https://search.jd.com/Search'
     print("输入商品名称：")
-    str1=str(input())
+    str1 = str(input())
     data = {
         'keyword': str1,
         'enc': 'utf-8',
-        'wq':str1,
+        'wq': str1,
     }
     session = requests.Session()
     response = session.get(url=url1, params=data, headers=headers).text
     tree = etree.HTML(response)
-    list=[]
+    list = []
     try:
         for i in range(1, 6):
             a = tree.xpath(
@@ -43,36 +42,42 @@ def pre_data():
         time.sleep(1)
     return list
 def get_dailiURL():
-    list=[]
-    url='http://api.tianqiip.com/getip'
-    data={
-        'type':'txt',
-        'num':1,
-        'port':2,
-        'time':5,
-        'secret':''#这里的secret的键值是自己的提取码
+    list = []
+    total_list=[]
+    url = 'http://api.tianqiip.com/getip'
+    data = {
+        'type': 'txt',
+        'num': 1,
+        'port': 2,
+        'time': 3,
+        'secret': ''
     }
     for i in range(5):
-        response = requests.get(url=url, params=data)
-        list.append(response.text)
-    return list
-def getinformation(id,index,daili_url_list):
-    url='https://club.jd.com/comment/productPageComments.action?callback=fetchJSON_comment98&productId='+id+'&score=0&sortType=5&page={0}&pageSize=10&isShadowSku=0&rid=0&fold=1'
-    str=choice(daili_url_list)
+        for j in range(5):
+            response = requests.get(url=url, params=data)
+            list.append(response.text)
+        t = (list[0], list[1], list[2], list[3], list[4])
+        total_list.append(t)
+        list.clear()
 
-    str='https://'+str
-    proxies={
-        'https':str
+    return total_list
+def getinformation(id, index, daili_url_list):
+    url = 'https://club.jd.com/comment/productPageComments.action?callback=fetchJSON_comment98&productId=' + id + '&score=0&sortType=5&page={0}&pageSize=10&isShadowSku=0&rid=0&fold=1'
+    str = choice(daili_url_list)
+
+    str = 'https://' + str
+    proxies = {
+        'https': str
     }
     try:
         for i in range(999999):
             ''''''
-            response = requests.get(url=url.format(i), headers=headers,proxies=proxies)
-            time.sleep(random.random()*2)
+            response = requests.get(url=url.format(i), headers=headers, proxies=proxies)
+            time.sleep(random.random() * 2)
             json_response = response.text.replace('fetchJSON_comment98(', '').replace(');', '')
             # json转换为字典格式，读取评论数据
             json_response = json.loads(json_response)['comments']
-            print("正在提取第{}个商品的第{}页评论".format(index+1,i + 1))
+            print("正在提取第{}个商品的第{}页评论,商品号为：{}".format(index + 1, i + 1,id))
             columns = ['id', 'nickname', 'referenceTime', 'creationTime', 'referenceId', 'productColor', 'productSize',
                        'score', 'content']
             # 如下循环分别提取数据
@@ -98,46 +103,51 @@ def getinformation(id,index,daili_url_list):
                 # 生成器返回提取出的列表数据
                 yield (comment_one)
     except Exception as exp:
-        print(exp)
-def SaveCsv(path,id,i,daili_url_list):
+        print('第{}个：{},商品号为：{}'.format(index+1,exp,id))
+def SaveCsv(list):
+    path = list[3]
+    id = list[0]
+    i = list[2]
+    daili_url_list = list[1]
     end_columns = ['userId', 'userName', 'buyTime', 'commentTime', 'productId', 'productColor', 'productSize', 'score',
                    'comment', 'afterComment']
-    comments=open(path,'w',newline='',encoding='utf-8')
-    w=csv.writer(comments)
+    comments = open(path, 'w', newline='', encoding='utf-8')
+    w = csv.writer(comments)
     w.writerow(end_columns)
-    comments=getinformation(id,i,daili_url_list)
+    comments = getinformation(id, i, daili_url_list)
     for comment in comments:
         w.writerow(comment)
-def  classify(id):
-    new_list=[]
-    times_list=[]
+    print('第{}个商品评论爬取完毕'.format(i+1))
+def classify(id):
+    new_list = []
+    times_list = []
     file = open("count/{}shop.txt".format(id), 'w', encoding='utf-8')
-    csvFile = open('asus_comments'+str(id)+'.csv', 'r', encoding='utf-8')
+    csvFile = open('asus_comments' + str(id) + '.csv', 'r', encoding='utf-8')
     reader = csv.reader(csvFile)
     a = list(reader)
-    i=1
+    i = 1
     try:
         while a[i][5] != '':
             new_list.append(a[i][5])
             i += 1
     except:
         print(end='')
-    result=Counter(new_list)
+    result = Counter(new_list)
     for key in result:
         times_list.append(result[key])
-        file.write("{}:一共有{}条评论\n".format(key,result[key]))
+        file.write("{}:一共有{}条评论\n".format(key, result[key]))
     times_list.sort()
     times_list.reverse()
-    max_times=times_list[0]
+    max_times = times_list[0]
     for key in result:
-        if(result[key]==max_times):
-            file.write("\n" )
-            file.write("评论条数最多的商品是：%s"%(key))
+        if (result[key] == max_times):
+            file.write("\n")
+            file.write("评论条数最多的商品是：%s" % (key))
     print("第{}个商品评论类别归类完毕".format(id))
     file.close()
 def analysis(id):
-    #print('asus_comments{}.csv'.format(id))
-    #remove_file('asus_comments{}.csv'.format(id))
+    # print('asus_comments{}.csv'.format(id))
+    # remove_file('asus_comments{}.csv'.format(id))
     csvFile = open('asus_comments{}.csv'.format(id), 'r', encoding='utf-8')
     reader = csv.reader(csvFile)
     a = list(reader)
@@ -147,7 +157,7 @@ def analysis(id):
     file4 = open("analysis{}/4star.txt".format(id), 'w', encoding='utf-8')
     file5 = open("analysis{}/5star.txt".format(id), 'w', encoding='utf-8')
     for i in range(1, 100000):
-        if(a[i][7]==''):
+        if (a[i][7] == ''):
             break
         if a[i][7] == '1':
             file1.write(a[i][8] + '\n')
@@ -164,8 +174,8 @@ def analysis(id):
     file3.close()
     file4.close()
     file5.close()
-    print("第%d个商品完成数据预处理"%(id))
-def wordcloud_fun(path,num,id):
+    print("第%d个商品完成数据预处理" % (id))
+def wordcloud_fun(path, num, id):
     stopwords = set()
     content = [line.strip() for line in open('stopword.txt', 'r', encoding='utf-8').readlines()]
     stopwords.update(content)
@@ -175,12 +185,12 @@ def wordcloud_fun(path,num,id):
         font_path="C:/Windows/Fonts/simfang.ttf",  # 设置了背景，宽高
         background_color="white", width=1000, height=880, stopwords=stopwords).generate(cut_text)
 
-    wordcloud.to_file('wordcloud/shop{}/cloud{}.jpg'.format(id+1,num))
-    print("第{}个商品的{}星评论词云生成完毕".format(id+1,num))
+    wordcloud.to_file('wordcloud/shop{}/cloud{}.jpg'.format(id + 1, num))
+    print("第{}个商品的{}星评论词云生成完毕".format(id + 1, num))
     '''plt.imshow(wordcloud, interpolation="bilinear")
     plt.axis("off")
     plt.show()'''
-def time_calculate(id,i):#id是第几个商品，i是第几条评论
+def time_calculate(id, i):  # id是第几个商品，i是第几条评论
 
     csvFile = open('asus_comments' + str(id) + '.csv', 'r', encoding='utf-8')
     reader = csv.reader(csvFile)
@@ -190,18 +200,18 @@ def time_calculate(id,i):#id是第几个商品，i是第几条评论
     str1 = parse(str1)
     str2 = parse(str2)
     csvFile.close()
-    return ((str2 - str1).days)*86400+(str2 - str1).seconds
+    return ((str2 - str1).days) * 86400 + (str2 - str1).seconds
 def average(id):
-    sum=0
-    num=0
+    sum = 0
+    num = 0
 
     csvFile = open('asus_comments' + str(id) + '.csv', 'r', encoding='utf-8')
     reader = csv.reader(csvFile)
     a = list(reader)
     file = open("time_calculate/{}shop.txt".format(id), 'w', encoding='utf-8')
-    type_list=[]
+    type_list = []
     i = 1
-    if a[1][5]!=0:
+    if a[1][5] != 0:
         print("第{}个商品评论周期平均值计算完毕".format(id))
     try:
         while a[i][5] != '':
@@ -221,11 +231,10 @@ def average(id):
                     num += 1
             except:
                 print(end='')
-        aver=sum/num/86400
-        sum=0
-        num=0
-        file.write("%s的平均评论时间差是：%lf天\n"%(key,aver))
-
+        aver = sum / num / 86400
+        sum = 0
+        num = 0
+        file.write("%s的平均评论时间差是：%lf天\n" % (key, aver))
 def remove_file(path):
     if os.path.exists(path):
         os.remove(path)
@@ -252,8 +261,8 @@ def feel(id):
             sum_sentiment += sentiment
     except:
         print(end="")
-    total=good_counter+bad_counter+just_so_so_counter
-    file.write("-----------------共计" + str(total)+ "条评论---------------------------\n")
+    total = good_counter + bad_counter + just_so_so_counter
+    file.write("-----------------共计" + str(total) + "条评论---------------------------\n")
     file.write("-----------------0.8以上有" + str(good_counter) + "条评论----------------------\n")
     file.write("-----------------0.4-0.8有" + str(just_so_so_counter) + "条评论----------------------\n")
     file.write("-----------------0.4以下有" + str(bad_counter) + "条评论----------------------\n")
@@ -272,16 +281,34 @@ def setup_file():
         os.mkdir(c + "//shop%d" % (i))
 def main():
     setup_file()
-    list=pre_data()
-    print("符合要求的商品有%d种（最多取5种）"%len(list))
-    daili_url_list=get_dailiURL()
+    id_list = pre_data()
+    print("符合要求的商品有%d种（最多取5种）" % len(id_list))
+    daili_url_list = get_dailiURL()
     print("获取代理ip完成")
-    try:
+
+    # 数据预处理
+    file_list=['asus_comments1.csv','asus_comments2.csv','asus_comments3.csv','asus_comments4.csv','asus_comments5.csv']
+    order_list=[0,1,2,3,4]
+    total_list=[]
+    for i in range(len(id_list)):
+        for j in range(len(daili_url_list)):
+            if i == j:
+                for l in range(len(order_list)):
+                    if j == l:
+                        for m in range(len(file_list)):
+                            if l == m:
+                                t = (id_list[i], daili_url_list[i], order_list[i], file_list[i])
+                                total_list.append(t)
+    pool = Pool(5)
+    pool.map(SaveCsv, total_list)
+
+    '''try:
         for i in range(5):
 
             SaveCsv(r'asus_comments{}.csv'.format(i + 1), list[i],i,daili_url_list)
     except:
-        print(end="")
+        print(end="")'''
+
     for i in range(5):
 
         try:
@@ -291,7 +318,7 @@ def main():
     print("数据预处理完毕")
 
     for i in range(5):
-        for j in range(1,6):
+        for j in range(1, 6):
             try:
                 wordcloud_fun('analysis{}/{}star.txt'.format(i + 1, j), j, i)
             except:
@@ -313,6 +340,5 @@ def main():
             feel(i)
         except:
             print(end="")
-
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
